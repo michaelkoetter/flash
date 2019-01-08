@@ -38,6 +38,7 @@ OPTIONS:
   --force|-f      Force flash without security prompt (for automation)
   --userdata|-u   Copy this cloud-init file to /boot/user-data
   --metadata|-m   Copy this cloud-init file to /boot/meta-data
+  --network-config|-N   Copy this cloud-init network config to /boot/network-config
 
 If no image is specified, the script will try to configure an existing
 image. This is useful to try several configuration without the need to
@@ -79,6 +80,7 @@ do
     --force) args="${args}-f ";;
     --userdata) args="${args}-u ";;
     --metadata) args="${args}-m ";;
+    --network-config) args="${args}-N";;
     # pass through anything else
     *) [[ "${arg:0:1}" == "-" ]] || delim="\""
       args="${args}${delim}${arg}${delim} ";;
@@ -87,7 +89,7 @@ done
 # reset the translated args
 eval set -- "$args"
 # now we can process with getopt
-while getopts ":h:vc:n:s:p:C:l:d:fu:m:" opt; do
+while getopts ":h:vc:n:s:p:C:l:d:fu:m:N:" opt; do
   case $opt in
     h)  usage ;;
     v)  version ;;
@@ -101,6 +103,7 @@ while getopts ":h:vc:n:s:p:C:l:d:fu:m:" opt; do
     f)  FORCE=1 ;;
     u)  USER_DATA=$OPTARG ;;
     m)  META_DATA=$OPTARG ;;
+    N)  NETWORK_CONFIG=$OPTARG ;;
     \?) usage ;;
     :)
       echo "option -$OPTARG requires an argument"
@@ -501,6 +504,14 @@ if [ -n "${META_DATA}" ]; then
   fi
 fi
 
+if [ -n "${NETWORK_CONFIG}" ]; then
+  if [ ! -f "${NETWORK_CONFIG}" ]; then
+    echo "Cloud-init file ${NETWORK_CONFIG} not found!"
+    exit 10
+  fi
+  validate_yaml "${NETWORK_CONFIG}"
+fi
+
 if [ -n "${BOOT_CONF}" ]; then
   if [ ! -f "${BOOT_CONF}" ]; then
     echo "File ${BOOT_CONF} not found!"
@@ -661,7 +672,11 @@ mount_boot_disk "${disk}" "${boot}"
     cp "${META_DATA}" "${boot}/meta-data"
   fi
 
-
+  if [ -f "${NETWORK_CONFIG}" ]; then
+    echo "Copying cloud-init ${NETWORK_CONFIG} to ${boot}/network-config ..."
+    cp "${NETWORK_CONFIG}" "${boot}/network-config"
+  fi
+  
 if [ -f "${boot}/device-init.yaml" ]; then
   echo "Setting device-init"
   if [ -n "${SD_HOSTNAME}" ]; then
